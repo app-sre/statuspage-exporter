@@ -44,12 +44,14 @@ func (c Component) Print() string {
 type Components []Component
 
 type ComponentCollector struct {
-	Status *prometheus.Desc
+	Status      *prometheus.Desc
+	Operational *prometheus.Desc
 }
 
 func NewComponentCollector() *ComponentCollector {
 	return &ComponentCollector{
-		Status: prometheus.NewDesc(prometheus.BuildFQName("component", "", "status"), "Status", []string{"name", "group_id", "status"}, nil),
+		Status:      prometheus.NewDesc(prometheus.BuildFQName("component", "", "status"), "Status", []string{"name", "group_id", "status"}, nil),
+		Operational: prometheus.NewDesc(prometheus.BuildFQName("component", "", "operational"), "Status", []string{"name", "group_id"}, nil),
 	}
 }
 
@@ -59,11 +61,11 @@ func (cc *ComponentCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, c := range getComponents() {
-		switch c.Status {
-		case "operational":
-			ch <- prometheus.MustNewConstMetric(cc.Status, prometheus.GaugeValue, 1, c.Name, c.GroupId, c.Status)
-		default:
-			ch <- prometheus.MustNewConstMetric(cc.Status, prometheus.GaugeValue, 0, c.Name, c.GroupId, c.Status)
+		ch <- prometheus.MustNewConstMetric(cc.Status, prometheus.GaugeValue, 1, c.Name, c.GroupId, c.Status)
+		if c.Status == "operational" {
+			ch <- prometheus.MustNewConstMetric(cc.Operational, prometheus.GaugeValue, 1, c.Name, c.GroupId)
+		} else {
+			ch <- prometheus.MustNewConstMetric(cc.Operational, prometheus.GaugeValue, 0, c.Name, c.GroupId)
 		}
 	}
 }
