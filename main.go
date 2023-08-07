@@ -7,6 +7,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func handleError(err error) {
@@ -40,12 +43,55 @@ func (c Component) Print() string {
 // Components is multiple Component
 type Components []Component
 
+type ComponentCollector struct {
+	// Name *prometheus.Desc
+	// GroupId *prometheus.Desc
+	Status *prometheus.Desc
+}
+
+func NewComponentCollector() *ComponentCollector {
+	return &ComponentCollector{
+		Status: prometheus.NewDesc(prometheus.BuildFQName("component", "", "status"), "Status", []string{"name", "group_id", "status"}, nil),
+	}
+}
+
+func (cc *ComponentCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- cc.Status
+}
+
+func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
+	for _, c := range getComponents() {
+		switch c.Status {
+		case "operational":
+			ch <- prometheus.MustNewConstMetric(cc.Status, prometheus.GaugeValue, 1, c.Name, c.GroupId, c.Status)
+		default:
+			ch <- prometheus.MustNewConstMetric(cc.Status, prometheus.GaugeValue, 0, c.Name, c.GroupId, c.Status)
+		}
+	}
+}
+
 func main() {
+	// comps := getComponents()
+	// for _, c := range comps {
+	// 	fmt.Printf(c.Print())
+	// }
+
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(NewComponentCollector())
+	// reg.MustRegister(collectors.NewGoCollector())
+	// prometheus.MustRegister(NewComponentCollector())
+
+	fmt.Println("Now serving metrics at http://localhost:9101/metrics")
+	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
+	log.Fatal(http.ListenAndServe(":9101", nil))
+}
+
+func getComponents() Components {
 	pageId := os.Getenv("PAGE_ID")
 	token := os.Getenv("TOKEN")
 
 	// TODO: Figure out values for pagination
-	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=10", pageId)
+	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", pageId)
 
 	client := &http.Client{}
 
@@ -63,7 +109,5 @@ func main() {
 	var comps Components
 	handleError(json.Unmarshal(body, &comps))
 
-	for _, c := range comps {
-		fmt.Printf(c.Print())
-	}
+	return comps
 }
