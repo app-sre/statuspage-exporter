@@ -44,8 +44,6 @@ func (c Component) Print() string {
 type Components []Component
 
 type ComponentCollector struct {
-	// Name *prometheus.Desc
-	// GroupId *prometheus.Desc
 	Status *prometheus.Desc
 }
 
@@ -71,15 +69,8 @@ func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func main() {
-	// comps := getComponents()
-	// for _, c := range comps {
-	// 	fmt.Printf(c.Print())
-	// }
-
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(NewComponentCollector())
-	// reg.MustRegister(collectors.NewGoCollector())
-	// prometheus.MustRegister(NewComponentCollector())
 
 	fmt.Println("Now serving metrics at http://localhost:9101/metrics")
 	http.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
