@@ -170,7 +170,6 @@ func getComponents() (Components, error) {
 	var comps Components
 	err = json.Unmarshal(body, &comps)
 	if err != nil {
-		fmt.Println(string(body))
 		handleError(err)
 	}
 
