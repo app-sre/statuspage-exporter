@@ -62,6 +62,7 @@ func (cc *ComponentCollector) Describe(ch chan<- *prometheus.Desc) {
 func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, c := range getComponents() {
 		ch <- prometheus.MustNewConstMetric(cc.Status, prometheus.GaugeValue, 1, c.Name, c.GroupId, c.Status)
+
 		if c.Status == "operational" {
 			ch <- prometheus.MustNewConstMetric(cc.Operational, prometheus.GaugeValue, 1, c.Name, c.GroupId)
 		} else {
@@ -100,7 +101,11 @@ func getComponents() Components {
 	handleError(err)
 
 	var comps Components
-	handleError(json.Unmarshal(body, &comps))
+	err = json.Unmarshal(body, &comps)
+	if err != nil {
+		fmt.Println(string(body))
+		handleError(err)
+	}
 
 	return comps
 }
