@@ -82,7 +82,10 @@ func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
 	groups, err := getGroups()
 	handleError(err)
 
-	for _, c := range getComponents() {
+	components, err := getComponents()
+	handleError(err)
+
+	for _, c := range components {
 		group := ""
 		if c.GroupId != "" {
 			group = groups[c.GroupId]
@@ -98,30 +101,39 @@ func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func getGroups() (map[string]string, error) {
-	pageId := os.Getenv("PAGE_ID")
+func statusPageAPI(url string) ([]byte, error) {
 	token := os.Getenv("TOKEN")
-
-	// TODO: Figure out values for pagination
-	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", pageId)
 
 	client := &http.Client{}
 
 	req, err := http.NewRequest("GET", url, nil)
-	handleError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("OAuth %s", token))
 
 	resp, err := client.Do(req)
-	handleError(err)
+	if err != nil {
+		return nil, err
+	}
 
-	body, err := io.ReadAll(resp.Body)
-	handleError(err)
+	return io.ReadAll(resp.Body)
+}
+
+func getGroups() (map[string]string, error) {
+	pageId := os.Getenv("PAGE_ID")
+	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", pageId)
+
+	body, err := statusPageAPI(url)
+	if err != nil {
+		return nil, err
+	}
 
 	var compGroups ComponentGroups
 	err = json.Unmarshal(body, &compGroups)
 	if err != nil {
-		handleError(err)
+		return nil, err
 	}
 
 	groups := make(map[string]string)
@@ -144,25 +156,16 @@ func main() {
 	log.Fatal(http.ListenAndServe(":9101", nil))
 }
 
-func getComponents() Components {
+func getComponents() (Components, error) {
 	pageId := os.Getenv("PAGE_ID")
-	token := os.Getenv("TOKEN")
 
 	// TODO: Figure out values for pagination
 	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", pageId)
 
-	client := &http.Client{}
-
-	req, err := http.NewRequest("GET", url, nil)
-	handleError(err)
-
-	req.Header.Add("Authorization", fmt.Sprintf("OAuth %s", token))
-
-	resp, err := client.Do(req)
-	handleError(err)
-
-	body, err := io.ReadAll(resp.Body)
-	handleError(err)
+	body, err := statusPageAPI(url)
+	if err != nil {
+		return nil, err
+	}
 
 	var comps Components
 	err = json.Unmarshal(body, &comps)
@@ -171,5 +174,5 @@ func getComponents() Components {
 		handleError(err)
 	}
 
-	return comps
+	return comps, nil
 }
