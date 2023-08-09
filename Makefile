@@ -18,6 +18,11 @@ else
 endif
 	@$(CONTAINER_ENGINE) tag $(REPO):latest $(REPO):$(TAG)
 
+run:
+	$(shell source env.sh)
+	go run cmd/statuspage-exporter/main.go
+
+
 .PHONY: image-push
 image-push:
 	$(CONTAINER_ENGINE) --config=$(DOCKER_CONF) push $(REPO):$(TAG)
