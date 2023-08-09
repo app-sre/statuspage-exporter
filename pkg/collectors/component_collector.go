@@ -1,6 +1,7 @@
 package collectors
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -84,7 +85,11 @@ func (cc *ComponentCollector) IncrementErrors() {
 func statusPageAPI(url string, token string) ([]byte, error) {
 	client := &http.Client{}
 
-	req, err := http.NewRequest("GET", url, nil)
+	// TODO: Make this an arg
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
