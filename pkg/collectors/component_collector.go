@@ -1,12 +1,14 @@
 package collectors
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/app-sre/statuspage-exporter/pkg/api"
 	"github.com/app-sre/statuspage-exporter/pkg/config"
@@ -14,21 +16,36 @@ import (
 )
 
 type ComponentCollector struct {
-	Args            *config.Args
-	Status          *prometheus.Desc
-	Operational     *prometheus.Desc
-	APIErrorCount   int64
-	APIRequestCount int64
-	mutex           *sync.Mutex
+	Status        *prometheus.Desc
+	StatusMetrics []prometheus.Metric
+
+	Operational        *prometheus.Desc
+	OperationalMetrics []prometheus.Metric
+
+	APIErrorCount       *prometheus.Desc
+	APIErrorCountMetric float64
+
+	APIRequestCount       *prometheus.Desc
+	APIRequestCountMetric float64
+
+	Opts  *config.CollectorOpts
+	mutex *sync.Mutex
 }
 
-func NewComponentCollector(args *config.Args) *ComponentCollector {
-	return &ComponentCollector{
-		Args:        args,
-		Status:      prometheus.NewDesc(prometheus.BuildFQName("component", "", "status"), "Status", []string{"name", "group", "id", "group_id", "status"}, nil),
-		Operational: prometheus.NewDesc(prometheus.BuildFQName("component", "", "operational"), "Status", []string{"name", "group", "id", "group_id"}, nil),
-		mutex:       &sync.Mutex{},
+func NewComponentCollector(opts *config.CollectorOpts) *ComponentCollector {
+
+	cc := &ComponentCollector{
+		Opts:            opts,
+		Status:          prometheus.NewDesc(prometheus.BuildFQName("component", "", "status"), "Status", []string{"name", "group", "id", "group_id", "status"}, nil),
+		Operational:     prometheus.NewDesc(prometheus.BuildFQName("component", "", "operational"), "Operational", []string{"name", "group", "id", "group_id"}, nil),
+		APIErrorCount:   prometheus.NewDesc(prometheus.BuildFQName("component", "", "error_count"), "Error Count", []string{}, nil),
+		APIRequestCount: prometheus.NewDesc(prometheus.BuildFQName("component", "", "request_count"), "Request Count", []string{}, nil),
+		mutex:           &sync.Mutex{},
 	}
+
+	go cc.ScrapeLoop()
+
+	return cc
 }
 
 func (cc *ComponentCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -36,31 +53,18 @@ func (cc *ComponentCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
-	groups, err := cc.getGroups()
-	if err != nil {
-		cc.IncrementErrors()
-		log.Println(err)
+	cc.mutex.Lock()
+	defer cc.mutex.Unlock()
+
+	ch <- prometheus.MustNewConstMetric(cc.APIErrorCount, prometheus.GaugeValue, cc.APIErrorCountMetric)
+	ch <- prometheus.MustNewConstMetric(cc.APIRequestCount, prometheus.GaugeValue, cc.APIRequestCountMetric)
+
+	for _, v := range cc.StatusMetrics {
+		ch <- v
 	}
 
-	components, err := cc.getComponents()
-	if err != nil {
-		cc.IncrementErrors()
-		log.Println(err)
-	}
-
-	for _, c := range components {
-		group := ""
-		if c.GroupId != "" {
-			group = groups[c.GroupId]
-		}
-
-		ch <- prometheus.MustNewConstMetric(cc.Status, prometheus.GaugeValue, 1, c.Name, group, c.Id, c.GroupId, c.Status)
-
-		if c.Status == "operational" {
-			ch <- prometheus.MustNewConstMetric(cc.Operational, prometheus.GaugeValue, 1, c.Name, group, c.Id, c.GroupId)
-		} else {
-			ch <- prometheus.MustNewConstMetric(cc.Operational, prometheus.GaugeValue, 0, c.Name, group, c.Id, c.GroupId)
-		}
+	for _, v := range cc.OperationalMetrics {
+		ch <- v
 	}
 }
 
@@ -68,20 +72,23 @@ func (cc *ComponentCollector) IncrementRequests() {
 	cc.mutex.Lock()
 	defer cc.mutex.Unlock()
 
-	cc.APIRequestCount++
+	cc.APIRequestCountMetric++
 }
 
 func (cc *ComponentCollector) IncrementErrors() {
 	cc.mutex.Lock()
 	defer cc.mutex.Unlock()
 
-	cc.APIErrorCount++
+	cc.APIErrorCountMetric++
 }
 
-func statusPageAPI(url string, token string) ([]byte, error) {
+func statusPageAPI(url string, token string, timeout time.Duration) ([]byte, error) {
 	client := &http.Client{}
 
-	req, err := http.NewRequest("GET", url, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -97,15 +104,14 @@ func statusPageAPI(url string, token string) ([]byte, error) {
 }
 
 func (cc *ComponentCollector) getGroups() (map[string]string, error) {
-	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Args.PageId)
+	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Opts.PageId)
 
-	body, err := statusPageAPI(url, cc.Args.Token)
+	body, err := statusPageAPI(url, cc.Opts.Token, cc.Opts.ScraperTimeout)
 	if err != nil {
 		cc.IncrementErrors()
 		return nil, err
 	}
 
-	// var compGroups api.ComponentGroups
 	var compGroups api.ComponentGroups
 	err = json.Unmarshal(body, &compGroups)
 	if err != nil {
@@ -126,9 +132,9 @@ func (cc *ComponentCollector) getGroups() (map[string]string, error) {
 
 func (cc *ComponentCollector) getComponents() (api.Components, error) {
 	// TODO: Figure out values for pagination
-	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Args.PageId)
+	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Opts.PageId)
 
-	body, err := statusPageAPI(url, cc.Args.Token)
+	body, err := statusPageAPI(url, cc.Opts.Token, cc.Opts.ScraperTimeout)
 	if err != nil {
 		cc.IncrementErrors()
 		return nil, err
@@ -138,9 +144,54 @@ func (cc *ComponentCollector) getComponents() (api.Components, error) {
 	err = json.Unmarshal(body, &comps)
 	if err != nil {
 		cc.IncrementErrors()
-		log.Println(err)
 		return nil, err
 	}
 
 	return comps, nil
+}
+
+func (cc *ComponentCollector) ScrapeLoop() {
+	for {
+		select {
+		case <-time.After(cc.Opts.ScraperInterval):
+
+			groups, err := cc.getGroups()
+			if err != nil {
+				cc.IncrementErrors()
+				log.Println(err)
+				continue
+			}
+
+			components, err := cc.getComponents()
+			if err != nil {
+				cc.IncrementErrors()
+				log.Println(err)
+				continue
+			}
+
+			cc.IncrementRequests()
+
+			cc.mutex.Lock()
+
+			// Clear out metrics each iteration
+			cc.StatusMetrics = make([]prometheus.Metric, len(components))
+			cc.OperationalMetrics = make([]prometheus.Metric, len(components))
+
+			for i, c := range components {
+				group := ""
+				if c.GroupId != "" {
+					group = groups[c.GroupId]
+				}
+
+				cc.StatusMetrics[i] = prometheus.MustNewConstMetric(cc.Status, prometheus.GaugeValue, 1, c.Name, group, c.Id, c.GroupId, c.Status)
+				if c.Status == "operational" {
+					cc.OperationalMetrics[i] = prometheus.MustNewConstMetric(cc.Operational, prometheus.GaugeValue, 1, c.Name, group, c.Id, c.GroupId)
+				} else {
+					cc.OperationalMetrics[i] = prometheus.MustNewConstMetric(cc.Operational, prometheus.GaugeValue, 0, c.Name, group, c.Id, c.GroupId)
+				}
+			}
+
+			cc.mutex.Unlock()
+		}
+	}
 }
