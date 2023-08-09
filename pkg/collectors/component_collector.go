@@ -6,28 +6,25 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 
 	"github.com/app-sre/statuspage-exporter/pkg/api"
+	"github.com/app-sre/statuspage-exporter/pkg/config"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// TODO: INcrement error metric https://github.com/app-sre/aws-resource-exporter/blob/master/pkg/awsclient/exporter.go#L64
-func handleError(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
 type ComponentCollector struct {
-	Status      *prometheus.Desc
-	Operational *prometheus.Desc
-	mutex       *sync.Mutex
+	Args            *config.Args
+	Status          *prometheus.Desc
+	Operational     *prometheus.Desc
+	APIErrorCount   int64
+	APIRequestCount int64
+	mutex           *sync.Mutex
 }
 
-func NewComponentCollector() *ComponentCollector {
+func NewComponentCollector(args *config.Args) *ComponentCollector {
 	return &ComponentCollector{
+		Args:        args,
 		Status:      prometheus.NewDesc(prometheus.BuildFQName("component", "", "status"), "Status", []string{"name", "group", "id", "group_id", "status"}, nil),
 		Operational: prometheus.NewDesc(prometheus.BuildFQName("component", "", "operational"), "Status", []string{"name", "group", "id", "group_id"}, nil),
 		mutex:       &sync.Mutex{},
@@ -39,11 +36,17 @@ func (cc *ComponentCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
-	groups, err := getGroups()
-	handleError(err)
+	groups, err := cc.getGroups()
+	if err != nil {
+		cc.IncrementErrors()
+		log.Println(err)
+	}
 
-	components, err := getComponents()
-	handleError(err)
+	components, err := cc.getComponents()
+	if err != nil {
+		cc.IncrementErrors()
+		log.Println(err)
+	}
 
 	for _, c := range components {
 		group := ""
@@ -61,9 +64,21 @@ func (cc *ComponentCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func statusPageAPI(url string) ([]byte, error) {
-	token := os.Getenv("TOKEN")
+func (cc *ComponentCollector) IncrementRequests() {
+	cc.mutex.Lock()
+	defer cc.mutex.Unlock()
 
+	cc.APIRequestCount++
+}
+
+func (cc *ComponentCollector) IncrementErrors() {
+	cc.mutex.Lock()
+	defer cc.mutex.Unlock()
+
+	cc.APIErrorCount++
+}
+
+func statusPageAPI(url string, token string) ([]byte, error) {
 	client := &http.Client{}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -81,12 +96,12 @@ func statusPageAPI(url string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func getGroups() (map[string]string, error) {
-	pageId := os.Getenv("PAGE_ID")
-	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", pageId)
+func (cc *ComponentCollector) getGroups() (map[string]string, error) {
+	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Args.PageId)
 
-	body, err := statusPageAPI(url)
+	body, err := statusPageAPI(url, cc.Args.Token)
 	if err != nil {
+		cc.IncrementErrors()
 		return nil, err
 	}
 
@@ -94,6 +109,7 @@ func getGroups() (map[string]string, error) {
 	var compGroups api.ComponentGroups
 	err = json.Unmarshal(body, &compGroups)
 	if err != nil {
+		cc.IncrementErrors()
 		return nil, err
 	}
 
@@ -108,21 +124,22 @@ func getGroups() (map[string]string, error) {
 	return groups, nil
 }
 
-func getComponents() (api.Components, error) {
-	pageId := os.Getenv("PAGE_ID")
-
+func (cc *ComponentCollector) getComponents() (api.Components, error) {
 	// TODO: Figure out values for pagination
-	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", pageId)
+	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Args.PageId)
 
-	body, err := statusPageAPI(url)
+	body, err := statusPageAPI(url, cc.Args.Token)
 	if err != nil {
+		cc.IncrementErrors()
 		return nil, err
 	}
 
 	var comps api.Components
 	err = json.Unmarshal(body, &comps)
 	if err != nil {
-		handleError(err)
+		cc.IncrementErrors()
+		log.Println(err)
+		return nil, err
 	}
 
 	return comps, nil

@@ -1,3 +1,4 @@
+SHELL				:= /bin/bash
 NAME				:= statuspage-exporter
 REPO				:= quay.io/app-sre/$(NAME)
 TAG					:= $(shell git rev-parse --short HEAD)
@@ -19,8 +20,7 @@ endif
 	@$(CONTAINER_ENGINE) tag $(REPO):latest $(REPO):$(TAG)
 
 run:
-	$(shell source env.sh)
-	go run cmd/statuspage-exporter/main.go
+	@source env.sh && go run cmd/statuspage-exporter/main.go -page-id $(PAGE_ID)
 
 
 .PHONY: image-push
