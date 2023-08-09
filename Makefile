@@ -7,7 +7,7 @@ PKGS				:= $(shell go list ./... | grep -v -E '/vendor/|/test')
 
 .PHONY: build
 build:
-	go build -o $(NAME) ./main.go
+	go build -o $(NAME) cmd/status-page-exporter/main.go 
 
 .PHONY: image
 image:
