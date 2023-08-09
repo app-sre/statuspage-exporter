@@ -1,0 +1,63 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    description: Deployment for statuspage-exporter
+  labels:
+    app: statuspage-exporter
+    app.kubernetes.io/component: statuspage-exporter
+    app.kubernetes.io/instance: statuspage-exporter
+    app.kubernetes.io/name: statuspage-exporter
+    app.kubernetes.io/part-of: statuspage-exporter
+  name: statuspage-exporter
+  # namespace: <++>
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: statuspage-exporter
+  template:
+    metadata:
+      labels:
+        app: statuspage-exporter
+    spec:
+      containers:
+      - name: statuspage-exporter
+        # TODO: replace with image name
+        image: quay.io/app-sre/statuspage-exporter
+        imagePullPolicy: Always
+        # TODO: envFrom Secret
+        env:
+          - name: PAGE_ID
+            value: foo
+          - name: TOKEN
+            value: bar
+        ports:
+        - containerPort: 9101
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    description: Service for exporter
+  labels:
+    app: exporter
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/instance: exporter
+    app.kubernetes.io/name: exporter
+    app.kubernetes.io/part-of: exporter
+  name: exporter
+  # namespace: <++>
+spec:
+  ports:
+  - name: exporter
+    port: 9101
+    protocol: TCP
+    targetPort: 9101
+  selector:
+    app: exporter
+  sessionAffinity: None
+  type: ClusterIP
+

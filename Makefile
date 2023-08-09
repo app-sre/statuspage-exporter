@@ -1,3 +1,4 @@
+SHELL				:= /bin/bash
 NAME				:= statuspage-exporter
 REPO				:= quay.io/app-sre/$(NAME)
 TAG					:= $(shell git rev-parse --short HEAD)
@@ -7,7 +8,7 @@ PKGS				:= $(shell go list ./... | grep -v -E '/vendor/|/test')
 
 .PHONY: build
 build:
-	go build -o $(NAME) ./main.go
+	go build -o $(NAME) cmd/statuspage-exporter/main.go 
 
 .PHONY: image
 image:
@@ -17,6 +18,10 @@ else
 	@DOCKER_BUILDKIT=1 $(CONTAINER_ENGINE) --config=$(DOCKER_CONF) build --no-cache -f ./Containerfile -t $(REPO):latest . --progress=plain
 endif
 	@$(CONTAINER_ENGINE) tag $(REPO):latest $(REPO):$(TAG)
+
+run:
+	@source env.sh && go run cmd/statuspage-exporter/main.go -page-id $(PAGE_ID)
+
 
 .PHONY: image-push
 image-push:
