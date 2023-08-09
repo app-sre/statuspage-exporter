@@ -25,7 +25,7 @@ spec:
       containers:
       - name: statuspage-exporter
         # TODO: replace with image name
-        image: statuspage-exporter
+        image: quay.io/app-sre/statuspage-exporter
         imagePullPolicy: Always
         # TODO: envFrom Secret
         env:
