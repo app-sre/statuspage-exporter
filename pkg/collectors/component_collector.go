@@ -28,14 +28,14 @@ type ComponentCollector struct {
 	APIRequestCount       *prometheus.Desc
 	APIRequestCountMetric float64
 
-	Args  *config.Args
+	Opts  *config.CollectorOpts
 	mutex *sync.Mutex
 }
 
-func NewComponentCollector(args *config.Args) *ComponentCollector {
+func NewComponentCollector(opts *config.CollectorOpts) *ComponentCollector {
 
 	cc := &ComponentCollector{
-		Args:            args,
+		Opts:            opts,
 		Status:          prometheus.NewDesc(prometheus.BuildFQName("component", "", "status"), "Status", []string{"name", "group", "id", "group_id", "status"}, nil),
 		Operational:     prometheus.NewDesc(prometheus.BuildFQName("component", "", "operational"), "Operational", []string{"name", "group", "id", "group_id"}, nil),
 		APIErrorCount:   prometheus.NewDesc(prometheus.BuildFQName("component", "", "error_count"), "Error Count", []string{}, nil),
@@ -82,11 +82,10 @@ func (cc *ComponentCollector) IncrementErrors() {
 	cc.APIErrorCountMetric++
 }
 
-func statusPageAPI(url string, token string) ([]byte, error) {
+func statusPageAPI(url string, token string, timeout time.Duration) ([]byte, error) {
 	client := &http.Client{}
 
-	// TODO: Make this an arg
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -105,9 +104,9 @@ func statusPageAPI(url string, token string) ([]byte, error) {
 }
 
 func (cc *ComponentCollector) getGroups() (map[string]string, error) {
-	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Args.PageId)
+	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Opts.PageId)
 
-	body, err := statusPageAPI(url, cc.Args.Token)
+	body, err := statusPageAPI(url, cc.Opts.Token, cc.Opts.ScraperTimeout)
 	if err != nil {
 		cc.IncrementErrors()
 		return nil, err
@@ -133,9 +132,9 @@ func (cc *ComponentCollector) getGroups() (map[string]string, error) {
 
 func (cc *ComponentCollector) getComponents() (api.Components, error) {
 	// TODO: Figure out values for pagination
-	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Args.PageId)
+	url := fmt.Sprintf("https://api.statuspage.io/v1/pages/%s/components?page=1&per_page=500", cc.Opts.PageId)
 
-	body, err := statusPageAPI(url, cc.Args.Token)
+	body, err := statusPageAPI(url, cc.Opts.Token, cc.Opts.ScraperTimeout)
 	if err != nil {
 		cc.IncrementErrors()
 		return nil, err
@@ -154,8 +153,7 @@ func (cc *ComponentCollector) getComponents() (api.Components, error) {
 func (cc *ComponentCollector) ScrapeLoop() {
 	for {
 		select {
-		// TODO: Make this an arg
-		case <-time.After(5 * time.Second):
+		case <-time.After(cc.Opts.ScraperInterval):
 
 			groups, err := cc.getGroups()
 			if err != nil {
