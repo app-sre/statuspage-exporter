@@ -1,6 +1,6 @@
 FROM registry.access.redhat.com/ubi9/go-toolset
 
-COPY main .
+COPY ./statuspage-exporter .
 
 ARG PAGE_ID
 ARG TOKEN
@@ -9,4 +9,4 @@ EXPOSE 9101
 
 ENTRYPOINT [ "/usr/bin/sh" ]
 
-CMD [ "-c", "./main" ]
+CMD [ "-c", "./statuspage-exporter" ]

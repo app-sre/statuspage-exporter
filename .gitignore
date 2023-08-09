@@ -1,3 +1,4 @@
 env.sh
 tmp/
-status-page-exporter/main
+statuspage-exporter
+.docker/
