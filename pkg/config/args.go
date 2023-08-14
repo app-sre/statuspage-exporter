@@ -20,7 +20,7 @@ func Parse() *CollectorOpts {
 	args.Token = os.Getenv("TOKEN")
 
 	flag.StringVar(&args.PageId, "page-id", "", "Page ID used for statuspage")
-	flag.StringVar(&args.Port, "port", "9115", "Port used for metrics server")
+	flag.StringVar(&args.Port, "port", "9101", "Port used for metrics server")
 	flag.DurationVar(&args.ScraperTimeout, "scraper-timeout", 4*time.Second, "Timeout for scraper http calls")
 	flag.DurationVar(&args.ScraperInterval, "scraper-interval", 5*time.Second, "Interval for scraping metrics")
 
