@@ -26,10 +26,6 @@ objects:
           app: ${NAME}
       spec:
         serviceAccountName: ${NAME}
-        volumes:
-          - name: exporter-configuration
-            configMap:
-              name: ${CONFIGMAP_NAME}
         containers:
         - name: statuspage-exporter
           image: ${IMAGE}:${IMAGE_TAG}
@@ -41,8 +37,8 @@ objects:
           - name: TOKEN
             valueFrom:
               secretKeyRef:
-                name: ${SECRET_NAME}
-                key: TOKEN
+                name: ${TOKEN_SECRET_NAME}
+                key: ${TOKEN_SECRET_KEY}
           resources:
             limits:
               cpu: ${CPU_LIMITS}
@@ -95,10 +91,10 @@ parameters:
   value: latest
 - name: REPLICAS
   value: "1"
-- name: SECRET_NAME
+- name: TOKEN_SECRET_NAME
   value: statuspage-exporter
-- name: CONFIGMAP_NAME
-  value: statuspage-exporter-config
+- name: TOKEN_SECRET_KEY
+  value: TOKEN
 - name: CPU_LIMITS
   value: 200m
 - name: CPU_REQUESTS
