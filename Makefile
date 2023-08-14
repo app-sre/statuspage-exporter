@@ -8,7 +8,7 @@ PKGS				:= $(shell go list ./... | grep -v -E '/vendor/|/test')
 
 .PHONY: build
 build:
-	go build -o $(NAME) cmd/statuspage-exporter/main.go 
+	go build -o $(NAME) cmd/statuspage-exporter/main.go
 
 .PHONY: image
 image:
@@ -35,7 +35,7 @@ kube: build
 
 .PHONY: clean
 clean:
-	rm -f main statuspage-exporter/main
+	rm -f ./statuspage-exporter
 
 ###########
 # Testing #
