@@ -29,8 +29,11 @@ objects:
         containers:
         - name: statuspage-exporter
           image: ${IMAGE}:${IMAGE_TAG}
+          args:
+          - "-page-id"
+          - "${PAGE_ID}"
           ports:
-          - containerPort: 9115
+          - containerPort: 9101
             name: http
             protocol: TCP
           env:
@@ -79,8 +82,8 @@ objects:
     ports:
     - name: http
       protocol: TCP
-      port: 9115
-      targetPort: 9115
+      port: 9101
+      targetPort: 9101
     type: ClusterIP
 parameters:
 - name: NAME
@@ -103,3 +106,4 @@ parameters:
   value: 150Mi
 - name: MEMORY_REQUESTS
   value: 150Mi
+- name: PAGE_ID
