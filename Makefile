@@ -1,7 +1,7 @@
 SHELL				:= /bin/bash
 NAME				:= statuspage-exporter
 REPO				:= quay.io/app-sre/$(NAME)
-TAG					:= $(shell git rev-parse --short HEAD)
+TAG					?= $(shell git rev-parse --short HEAD)
 
 CONTAINER_ENGINE    ?= $(shell which podman >/dev/null 2>&1 && echo podman || echo docker)
 PKGS				:= $(shell go list ./... | grep -v -E '/vendor/|/test')
@@ -13,11 +13,14 @@ build:
 .PHONY: image
 image:
 ifeq ($(CONTAINER_ENGINE), podman)
-	@DOCKER_BUILDKIT=1 $(CONTAINER_ENGINE) build --no-cache -f ./Containerfile -t $(REPO):latest . --progress=plain
+	DOCKER_BUILDKIT=1 $(CONTAINER_ENGINE) build --no-cache -t $(REPO):$(TAG) . --progress=plain
 else
-	@DOCKER_BUILDKIT=1 $(CONTAINER_ENGINE) --config=$(DOCKER_CONF) build --no-cache -f ./Containerfile -t $(REPO):latest . --progress=plain
+	DOCKER_BUILDKIT=1 $(CONTAINER_ENGINE) --config=$(DOCKER_CONF) build --no-cache -t $(REPO):latest . --progress=plain
 endif
-	@$(CONTAINER_ENGINE) tag $(REPO):latest $(REPO):$(TAG)
+
+.PHONY: image
+image-latest: image
+	$(CONTAINER_ENGINE) tag $(REPO):$(TAG) $(REPO):latest
 
 run:
 	@source env.sh && go run cmd/statuspage-exporter/main.go -page-id $(PAGE_ID)
@@ -51,3 +54,7 @@ test: vet test-unit
 .PHONY: test-unit
 test-unit:
 	go test -race -short $(PKGS) -count=1
+
+.PHONY: container-test
+container-test:
+	$(CONTAINER_ENGINE) build --target test -t $(REPO):$(TAG) -f Dockerfile .
