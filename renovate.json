@@ -6,5 +6,16 @@
   "gomod": {
     "enabled": true
   },
-  "postUpdateOptions": ["gomodTidy"]
+  "postUpdateOptions": ["gomodTidy"],
+  "packageRules": [
+    {
+      "description": "Automerge updates to Ubi images",
+      "matchPackageNames": [
+        "registry.access.redhat.com/ubi9/go-toolset"
+      ],
+      "datasources": ["docker"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    }
+  ]
 }
