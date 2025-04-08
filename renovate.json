@@ -22,6 +22,18 @@
         "patch"
       ],
       "automerge": true
+    },
+    {
+      "description": "Automerge of go modules",
+      "matchPackageNames": [
+        "github.com/prometheus/client_golang",
+        "github.com/prometheus/common",
+        "golang.org/x/sys",
+        "google.golang.org/protobuf"
+      ],
+      "datasources": ["go"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
     }
   ]
 }
