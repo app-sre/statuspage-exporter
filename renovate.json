@@ -31,8 +31,13 @@
         "golang.org/x/sys",
         "google.golang.org/protobuf"
       ],
-      "datasources": ["go"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchDatasources": [
+        "go"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true
     }
   ]
