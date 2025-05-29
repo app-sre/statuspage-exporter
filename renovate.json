@@ -6,15 +6,38 @@
   "gomod": {
     "enabled": true
   },
-  "postUpdateOptions": ["gomodTidy"],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
   "packageRules": [
     {
       "description": "Automerge updates to Ubi images",
       "matchPackageNames": [
         "registry.access.redhat.com/ubi9/go-toolset"
       ],
-      "datasources": ["docker"],
-      "matchUpdateTypes": ["patch"],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true
+    },
+    {
+      "description": "Automerge of go modules",
+      "matchPackageNames": [
+        "github.com/prometheus/client_golang",
+        "github.com/prometheus/common",
+        "golang.org/x/sys",
+        "google.golang.org/protobuf"
+      ],
+      "matchDatasources": [
+        "go"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true
     }
   ]
