@@ -2,7 +2,7 @@ module github.com/app-sre/statuspage-exporter
 
 go 1.24.0
 
-toolchain go1.24.6
+toolchain go1.25.1
 
 require github.com/prometheus/client_golang v1.23.2
 
@@ -16,5 +16,5 @@ require (
 	github.com/prometheus/procfs v0.17.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/sys v0.36.0 // indirect
-	google.golang.org/protobuf v1.36.9 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 )
