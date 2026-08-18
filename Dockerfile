@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/go-toolset:1.26.5-1786522985@sha256:444e81b3e88d8a68b92a081a7b3abc7d3fed2450f8473ea6b3caebf3bb73a0b8 as builder
+FROM registry.access.redhat.com/ubi9/go-toolset:1.26.5-1786971605@sha256:1a9bbbfa854931a97dbff276bd69dc0e32b36cb2fbce3b9813b2cf9892aa8d43 as builder
 COPY LICENSE /licenses/LICENSE
 WORKDIR /build
 RUN git config --global --add safe.directory /build
@@ -8,7 +8,7 @@ RUN make build
 FROM builder as test
 RUN make test
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8-1786380870@sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8-1786987521@sha256:8eb2830d0936237fc13a1f2f7e45aecf90d69043380ad167fad0343632937f41
 COPY --from=builder /build/statuspage-exporter  /bin/statuspage-exporter
 EXPOSE 9101
 ENTRYPOINT [ "/bin/statuspage-exporter" ]
